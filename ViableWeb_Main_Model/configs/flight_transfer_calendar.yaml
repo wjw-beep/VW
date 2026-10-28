@@ -1,0 +1,279 @@
+name: flight_transfer_calendar
+initial_facts:
+  safety_ok: true
+  transfer_aligned: true
+  calendar_aligned: true
+  transfer_disrupted: false
+  calendar_disrupted: false
+initial_evidence:
+  right_transfer_modify:
+    status: verified
+    issuer: transfer_provider
+    scope: modify_transfer
+    source: provider_api
+    observed_at: 0
+    valid_until: 6
+  right_transfer_replace:
+    status: verified
+    issuer: transfer_provider
+    scope: replace_transfer
+    source: provider_api
+    observed_at: 0
+    valid_until: 6
+  right_calendar_edit:
+    status: verified
+    issuer: calendar_provider
+    scope: edit_calendar
+    source: provider_api
+    observed_at: 0
+    valid_until: 7
+contract:
+  budget: 0.96
+  authorities:
+    - modify_transfer
+    - replace_transfer
+    - edit_calendar
+  safety:
+    safety_ok: true
+  obligations:
+    - id: transfer_commitment
+      trigger_fact: transfer_disrupted
+      fact: transfer_aligned
+      deadline: 3.75
+      evidence_key: confirmed_transfer
+      evidence_issuer: transfer_provider
+      evidence_scope: transfer_state
+      evidence_sources:
+        - provider_api
+    - id: calendar_commitment
+      trigger_fact: calendar_disrupted
+      fact: calendar_aligned
+      deadline: 4.75
+      evidence_key: confirmed_calendar
+      evidence_issuer: calendar_provider
+      evidence_scope: calendar_state
+      evidence_sources:
+        - provider_api
+capabilities:
+  - id: transfer_modify
+    service: transfer_provider
+    scope: modify_transfer
+    acquisition_cost: 0.23
+    capacity: 1
+    expires_at: 3.6
+    authority: modify_transfer
+    evidence_key: right_transfer_modify
+    acquirable: true
+    initial_owned: false
+    preconditions:
+      safety_ok: true
+  - id: transfer_replace
+    service: transfer_provider
+    scope: replace_transfer
+    acquisition_cost: 0.40
+    capacity: 1
+    expires_at: 3.8
+    authority: replace_transfer
+    evidence_key: right_transfer_replace
+    acquirable: true
+    initial_owned: false
+    preconditions:
+      safety_ok: true
+  - id: calendar_edit
+    service: calendar_provider
+    scope: edit_calendar
+    acquisition_cost: 0.22
+    capacity: 1
+    expires_at: 4.7
+    authority: edit_calendar
+    evidence_key: right_calendar_edit
+    acquirable: true
+    initial_owned: false
+    preconditions:
+      safety_ok: true
+actions:
+  - id: modify_transfer
+    service: transfer_provider
+    scope: modify_transfer
+    authority: modify_transfer
+    cost: 0.11
+    duration: 0.2
+    requires:
+      transfer_modify: 1
+    preconditions:
+      transfer_disrupted: true
+      transfer_aligned: false
+    postconditions:
+      transfer_aligned: true
+    conflict_key: transfer_booking
+  - id: replace_transfer
+    service: transfer_provider
+    scope: replace_transfer
+    authority: replace_transfer
+    cost: 0.22
+    duration: 0.2
+    requires:
+      transfer_replace: 1
+    preconditions:
+      transfer_disrupted: true
+      transfer_aligned: false
+    postconditions:
+      transfer_aligned: true
+    conflict_key: transfer_booking
+  - id: update_calendar
+    service: calendar_provider
+    scope: edit_calendar
+    authority: edit_calendar
+    cost: 0.10
+    duration: 0.2
+    requires:
+      calendar_edit: 1
+    preconditions:
+      calendar_disrupted: true
+      calendar_aligned: false
+    postconditions:
+      calendar_aligned: true
+    conflict_key: calendar_event
+nodes:
+  - id: root
+    parent: null
+    time: 0
+    observation: initial_confirmed
+    actions: []
+  - id: on_time
+    parent: root
+    time: 2
+    observation: flight_on_time
+    actions: []
+  - id: delay
+    parent: root
+    time: 2
+    observation: flight_delayed
+    actions: []
+  - id: transfer
+    parent: delay
+    time: 3
+    observation: transfer_recovery_window
+    actions:
+      - modify_transfer
+      - replace_transfer
+  - id: calendar
+    parent: transfer
+    time: 4
+    observation: calendar_recovery_window
+    actions:
+      - update_calendar
+leaves:
+  - id: on_time
+    path:
+      - root
+      - on_time
+    events: {}
+    responses: {}
+  - id: delayed_modify_works
+    path:
+      - root
+      - delay
+      - transfer
+      - calendar
+    events:
+      delay:
+        facts:
+          transfer_aligned: false
+          calendar_aligned: false
+          transfer_disrupted: true
+          calendar_disrupted: true
+    responses:
+      modify_transfer:
+        status: verified
+        facts:
+          transfer_aligned: true
+        evidence:
+          confirmed_transfer:
+            status: verified
+            issuer: transfer_provider
+            scope: transfer_state
+            source: provider_api
+            observed_at: 3.2
+            valid_until: 5
+      replace_transfer:
+        status: verified
+        facts:
+          transfer_aligned: true
+        evidence:
+          confirmed_transfer:
+            status: verified
+            issuer: transfer_provider
+            scope: transfer_state
+            source: provider_api
+            observed_at: 3.2
+            valid_until: 5
+      update_calendar:
+        status: verified
+        facts:
+          calendar_aligned: true
+        evidence:
+          confirmed_calendar:
+            status: verified
+            issuer: calendar_provider
+            scope: calendar_state
+            source: provider_api
+            observed_at: 4.2
+            valid_until: 6
+  - id: delayed_modify_refuted
+    path:
+      - root
+      - delay
+      - transfer
+      - calendar
+    events:
+      delay:
+        facts:
+          transfer_aligned: false
+          calendar_aligned: false
+          transfer_disrupted: true
+          calendar_disrupted: true
+    responses:
+      modify_transfer:
+        status: refuted
+      replace_transfer:
+        status: verified
+        facts:
+          transfer_aligned: true
+        evidence:
+          confirmed_transfer:
+            status: verified
+            issuer: transfer_provider
+            scope: transfer_state
+            source: provider_api
+            observed_at: 3.2
+            valid_until: 5
+      update_calendar:
+        status: verified
+        facts:
+          calendar_aligned: true
+        evidence:
+          confirmed_calendar:
+            status: verified
+            issuer: calendar_provider
+            scope: calendar_state
+            source: provider_api
+            observed_at: 4.2
+            valid_until: 6
+distributions:
+  - id: nominal
+    probabilities:
+      on_time: 0.25
+      delayed_modify_works: 0.55
+      delayed_modify_refuted: 0.20
+  - id: disruption_stress
+    probabilities:
+      on_time: 0.15
+      delayed_modify_works: 0.40
+      delayed_modify_refuted: 0.45
+solver:
+  acquisition_penalty: 0.15
+  usage_penalty: 0.20
+  max_portfolios: 1024
+  max_policies: 100000
+  epsilon: 0.000000001

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "viableweb-core"
+version = "0.1.0"
+description = "Configuration-driven finite ViableWeb contingent recovery planning and evidence-gated replay"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6.0"]
+
+[project.scripts]
+viableweb = "viableweb.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

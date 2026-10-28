@@ -1,0 +1,143 @@
+name: pending_reconciliation
+initial_facts:
+  safety_ok: true
+  disrupted: false
+  booking_ok: true
+initial_evidence:
+  right_booking:
+    status: verified
+    issuer: booking_service
+    scope: booking_edit
+    source: provider_api
+    observed_at: 0
+    valid_until: 9
+contract:
+  budget: 0.8
+  authorities:
+    - booking_edit
+  safety:
+    safety_ok: true
+  obligations:
+    - id: booking
+      trigger_fact: disrupted
+      fact: booking_ok
+      deadline: 5
+      evidence_key: booking_proof
+      evidence_issuer: booking_service
+      evidence_scope: booking_state
+      evidence_sources:
+        - provider_api
+capabilities:
+  - id: edit_right
+    service: booking_service
+    scope: booking_edit
+    acquisition_cost: 0.1
+    capacity: 2
+    expires_at: 8
+    authority: booking_edit
+    evidence_key: right_booking
+    initial_owned: false
+    acquirable: true
+actions:
+  - id: submit_change
+    service: booking_service
+    scope: booking_edit
+    authority: booking_edit
+    cost: 0.2
+    duration: 0.1
+    requires:
+      edit_right: 1
+    preconditions:
+      disrupted: true
+      booking_ok: false
+    postconditions:
+      booking_ok: true
+    conflict_key: same_booking
+  - id: retry_change
+    service: booking_service
+    scope: booking_edit
+    authority: booking_edit
+    cost: 0.2
+    duration: 0.1
+    requires:
+      edit_right: 1
+    preconditions:
+      disrupted: true
+      booking_ok: false
+    postconditions:
+      booking_ok: true
+    conflict_key: same_booking
+nodes:
+  - id: root
+    parent: null
+    time: 0
+    observation: initial
+    actions: []
+  - id: disrupted
+    parent: root
+    time: 1
+    observation: delay
+    actions:
+      - submit_change
+  - id: no_receipt
+    parent: disrupted
+    time: 2
+    observation: request_pending
+    actions:
+      - retry_change
+  - id: reconciled
+    parent: no_receipt
+    time: 3
+    observation: authoritative_confirmation
+    actions: []
+leaves:
+  - id: delayed_ack
+    path:
+      - root
+      - disrupted
+      - no_receipt
+      - reconciled
+    events:
+      disrupted:
+        facts:
+          booking_ok: false
+          disrupted: true
+      reconciled:
+        resolve:
+          same_booking:
+            status: verified
+            facts:
+              booking_ok: true
+            evidence:
+              booking_proof:
+                status: verified
+                issuer: booking_service
+                scope: booking_state
+                source: provider_api
+                observed_at: 3
+                valid_until: 7
+    responses:
+      submit_change:
+        status: pending
+      retry_change:
+        status: verified
+        facts:
+          booking_ok: true
+        evidence:
+          booking_proof:
+            status: verified
+            issuer: booking_service
+            scope: booking_state
+            source: provider_api
+            observed_at: 2.1
+            valid_until: 7
+distributions:
+  - id: sole
+    probabilities:
+      delayed_ack: 1
+solver:
+  acquisition_penalty: 0.1
+  usage_penalty: 0.1
+  max_portfolios: 32
+  max_policies: 1000
+  epsilon: 0.000000001
